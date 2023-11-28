@@ -1,17 +1,21 @@
 class CalorieTracker {
 	constructor() {
-		this._calorieLimit = 3000;
-		this._totalCalories = 0;
-		this._meals = [];
-		this._workouts = [];
+		this._calorieLimit = Storage.getCalorieLimit();
+		this._totalCalories = Storage.getTotalCalories();
+		this._meals = Storage.getMeals();
+		this._workouts = Storage.getWorkouts();
 
 		this._displayCaloriesLimit();
 		this._render();
+
+		document.getElementById('limit').value = this._calorieLimit;
 	}
 
 	addMeal(meal) {
 		this._meals.push(meal);
 		this._totalCalories += meal.calories;
+		Storage.updateTotalCalories(this._totalCalories);
+		Storage.saveMeal(meal);
 		this._displayNewMeal(meal);
 		this._render();
 	}
@@ -19,6 +23,8 @@ class CalorieTracker {
 	addWorkout(workout) {
 		this._workouts.push(workout);
 		this._totalCalories -= workout.calories;
+		Storage.updateTotalCalories(this._totalCalories);
+		Storage.saveWorkout(workout);
 		this._displayNewWorkout(workout);
 		this._render();
 	}
@@ -29,6 +35,8 @@ class CalorieTracker {
 			const meal = this._meals[index];
 			this._meals.splice(index, 1);
 			this._totalCalories -= meal.calories;
+			Storage.updateTotalCalories(this._totalCalories);
+			Storage.removeMeal(id);
 			this._render();
 		}
 	}
@@ -39,6 +47,8 @@ class CalorieTracker {
 			const workout = this._workouts[index];
 			this._workouts.splice(index, 1);
 			this._totalCalories += workout.calories;
+			Storage.updateTotalCalories(this._totalCalories);
+			Storage.removeWorkout(id);
 			this._render();
 		}
 	}
@@ -47,13 +57,20 @@ class CalorieTracker {
 		this._totalCalories = 0;
 		this._meals = [];
 		this._workouts = [];
+		Storage.clearAll();
 		this._render();
 	}
 
 	setLimit(calorieLimit) {
 		this._calorieLimit = calorieLimit;
+		Storage.setCalorieLimit(calorieLimit);
 		this._displayCaloriesLimit();
 		this._render();
+	}
+
+	loadItems() {
+		this._meals.forEach((meal) => this._displayNewMeal(meal));
+		this._workouts.forEach((workout) => this._displayNewWorkout(workout));
 	}
 
 	_displayCaloriesTotal() {
@@ -184,10 +201,77 @@ class Workout {
 	}
 }
 
+class Storage {
+	static getCalorieLimit(defaultLimit = 2000) {
+		const localStorageLimit = localStorage.getItem('calorieLimit');
+		return localStorageLimit === null ? defaultLimit : +localStorageLimit;
+	}
+	static setCalorieLimit(calorieLimit) {
+		localStorage.setItem('calorieLimit', calorieLimit);
+	}
+	static getTotalCalories(defaultCalories = 0) {
+		const localStorageCalories = localStorage.getItem('totalCalories');
+		return localStorageCalories === null
+			? defaultCalories
+			: +localStorageCalories;
+	}
+	static updateTotalCalories(calories) {
+		localStorage.setItem('totalCalories', calories);
+	}
+	static getMeals() {
+		const localStorageMeals = localStorage.getItem('meals');
+		return localStorageMeals === null ? [] : JSON.parse(localStorageMeals);
+	}
+
+	static saveMeal(meal) {
+		const meals = Storage.getMeals();
+		meals.push(meal);
+		localStorage.setItem('meals', JSON.stringify(meals));
+	}
+
+	static removeMeal(id) {
+		const meals = Storage.getMeals();
+		meals.forEach((meal, index) => {
+			if (meal.id === id) {
+				meals.splice(index, 1);
+			}
+		});
+		localStorage.setItem('meals', JSON.stringify(meals));
+	}
+
+	static removeWorkout(id) {
+		const workouts = Storage.getWorkouts();
+		workouts.forEach((workout, index) => {
+			if (workout.id === id) {
+				workouts.splice(index, 1);
+			}
+		});
+		localStorage.setItem('workouts', JSON.stringify(workouts));
+	}
+
+	static getWorkouts() {
+		const localStorageWorkouts = localStorage.getItem('workouts');
+		return localStorageWorkouts === null
+			? []
+			: JSON.parse(localStorageWorkouts);
+	}
+
+	static saveWorkout(workout) {
+		const workouts = Storage.getWorkouts();
+		workouts.push(workout);
+		localStorage.setItem('workouts', JSON.stringify(workouts));
+	}
+	static clearAll() {
+		localStorage.removeItem('totalCalories');
+		localStorage.removeItem('meals');
+		localStorage.removeItem('workouts');
+	}
+}
+
 class App {
 	constructor() {
 		this._tracker = new CalorieTracker();
-
+		this._tracker.loadItems();
 		document
 			.getElementById('meal-form')
 			.addEventListener('submit', this._newItem.bind(this, 'meal'));
